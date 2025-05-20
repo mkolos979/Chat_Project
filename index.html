@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.2.1/css/bootstrap.min.css">
+
+    <style>
+        body {
+            background: #fcfcfc;
+        }
+    </style>
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>Czat w czasie rzeczywistym</h2>
+            <p class="lead">Wpisz swoje imię i rozpocznij rozmowę</p>
+        </div>
+        <div class="row">
+            <div class="col-6">
+                <!-- Formularz do odbierania wiadomości i nazwa -->
+                <h3>Forma wiadomości</h3>
+                <form id="messForm">
+                    <label for="name">Imię</label>
+                    <input type="text" name="name" id="name" placeholder="Podaj imię" class="form-control">
+                    <br>
+                    <label for="message">Wiadomość</label>
+                    <textarea name="message" id="message" class="form-control" placeholder="Wpisz wiadomość"></textarea>
+                    <br>
+                    <input type="submit" value="Wyślij" class="btn btn-danger">
+                </form>
+            </div>
+            <div class="col-6">
+                <h3>Wiadomość</h3>
+                <!-- Dane wyjściowe wszystkich postów będą tutaj -->
+                <div id="all_mess"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // підключення до сервера
+
+        const form = document.getElementById('messForm');
+        const nameInput = document.getElementById('name');
+        const messageInput = document.getElementById('message');
+        const allMessages = document.getElementById('all_mess');
+
+        // надсилання повідомлення
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const name = nameInput.value.trim();
+            const message = messageInput.value.trim();
+
+            if (name && message) {
+                socket.emit('chat message', { name, message });
+                messageInput.value = ''; // очистити поле
+            }
+        });
+
+        // отримання повідомлення
+        socket.on('chat message', (data) => {
+            const div = document.createElement('div');
+            div.classList.add('alert', 'alert-secondary', 'mt-2');
+            div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+            allMessages.appendChild(div);
+        });
+    </script>
+
+</body>
+
+
+</html>
