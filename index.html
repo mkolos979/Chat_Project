@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 
 <head>
     <meta charset="UTF-8">
@@ -45,14 +45,14 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io(); // підключення до сервера
+        const socket = io(); // połączenie z serwerem
 
         const form = document.getElementById('messForm');
         const nameInput = document.getElementById('name');
         const messageInput = document.getElementById('message');
         const allMessages = document.getElementById('all_mess');
 
-        // надсилання повідомлення
+        // wysyłanie wiadomości
         form.addEventListener('submit', (e) => {
             e.preventDefault();
 
@@ -61,11 +61,11 @@
 
             if (name && message) {
                 socket.emit('chat message', { name, message });
-                messageInput.value = ''; // очистити поле
+                messageInput.value = ''; // wyczyść pole wiadomości
             }
         });
 
-        // отримання повідомлення
+        // odbieranie wiadomości
         socket.on('chat message', (data) => {
             const div = document.createElement('div');
             div.classList.add('alert', 'alert-secondary', 'mt-2');
