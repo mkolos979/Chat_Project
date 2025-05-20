@@ -54,15 +54,7 @@ io.on('connection', async (socket) => {
         console.log('Użytkownik rozłączony');
     });
 
-    // Obsługa historii czatu (ta część kodu wygląda na błędną — dotyczy klienta, nie serwera)
-    socket.on('chat history', (messages) => {
-        messages.forEach((data) => {
-            const div = document.createElement('div');
-            div.classList.add('alert', 'alert-light', 'mt-1');
-            div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
-            allMessages.appendChild(div);
-        });
-    });
+
 });
 
 // Uruchomienie serwera
