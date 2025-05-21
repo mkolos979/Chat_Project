@@ -9,22 +9,78 @@ const io = new Server(server); // <-- Zaktualizowany sposób inicjalizacji
 
 const mongoose = require('mongoose');
 
-// Zamień na swój prawdziwy adres URI MongoDB
+const session = require('express-session');
+const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
+const User = require('./models/User')
+
 const mongoURI = 'mongodb+srv://mkolos979:AWpDMSE6rlcy2eVY@cluster0.vwgjinv.mongodb.net/chatApp?retryWrites=true&w=majority';
 
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => {
-    console.log('✅ Połączono z MongoDB');
+    console.log('Połączono z MongoDB');
 }).catch((err) => {
-    console.error('❌ Błąd połączenia z MongoDB:', err);
+    console.error('Błąd połączenia z MongoDB:', err);
 });
 
-// Odpowiedź na żądanie GET
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+
+app.use(bodyParser.urlencoded({ extended: true })); //Middleware
+
+// -------
+app.use(session({
+    secret: 'sekretne_haslo',
+    resave: false,
+    saveUninitialized: true
+}));
+
+
+
+// Rejestracja użytkownika
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+    const hashedPass = await bcrypt.hash(password, 10);
+
+    try {
+        const user = new User({ username, password: hashedPass });
+        await user.save();
+        res.redirect('/logowanie.html');
+    } catch (e) {
+        res.send('Użytkownik już istnieje')
+    }
 });
+
+// Logowanie użytkownika
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+
+    if (user && await bcrypt.compare(password, user.password)) {
+        req.session.user = user;
+        res.redirect('/index.html');
+    } else {
+        res.send('Nieprawidłowy login lub hasło')
+    }
+});
+
+// tylko zalogowani użytkownicy
+app.get('/', (req, res) => {
+    if (req.session.user) {
+        res.sendFile(path.join(__dirname, 'index.html'));
+    } else {
+        res.redirect('/logowanie.html');
+    }
+});
+
+app.use(express.static(__dirname)); // ----
+
+//wylogowanie
+app.get('/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.redirect('/logowanie.html');
+    })
+})
 
 // Schemat wiadomości
 const messageSchema = new mongoose.Schema({
