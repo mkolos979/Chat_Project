@@ -113,6 +113,7 @@ io.on('connection', async (socket) => {
         io.emit('chat message', data); // wysyłamy do wszystkich
     });
 
+
     socket.on('disconnect', () => {
         console.log('Użytkownik rozłączony');
     });
