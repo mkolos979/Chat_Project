@@ -12,7 +12,9 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
+
 const User = require('./models/User')
+const Message = require('./models/Message')
 
 const mongoURI = 'mongodb+srv://mkolos979:AWpDMSE6rlcy2eVY@cluster0.vwgjinv.mongodb.net/chatApp?retryWrites=true&w=majority';
 
@@ -56,16 +58,21 @@ app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
 
-    if (user && await bcrypt.compare(password, user.password)) {
-        req.session.user = user;
-        res.redirect('/index.html');
-    } else {
-        res.send('Nieprawidłowy login lub hasło')
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+        return res.status(401).send('Błędne dane logowania');
     }
+
+    req.session.user = {
+        id: user._id,
+        username: user.username,
+        isAdmin: user.isAdmin
+    };
+
+    res.redirect('/chat');
 });
 
 // tylko zalogowani użytkownicy
-app.get('/', (req, res) => {
+app.get('/chat', (req, res) => {
     if (req.session.user) {
         res.sendFile(path.join(__dirname, 'index.html'));
     } else {
@@ -82,14 +89,14 @@ app.get('/logout', (req, res) => {
     })
 })
 
-// Schemat wiadomości
-const messageSchema = new mongoose.Schema({
-    name: String,
-    message: String,
-    timestamp: { type: Date, default: Date.now }
+app.get('/session', (req, res) => {
+    if (req.session && req.session.user) {
+        res.json(req.session.user);
+    } else {
+        res.status(401).json({ error: 'Nie zalogowany' });
+    }
 });
 
-const Message = mongoose.model('Message', messageSchema);
 
 // Obsługa połączenia Socket.IO
 io.on('connection', async (socket) => {

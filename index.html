@@ -26,14 +26,21 @@
                 <!-- Formularz do odbierania wiadomości i nazwa -->
                 <h3>Forma wiadomości</h3>
                 <form id="messForm">
-                    <label for="name">Imię</label>
-                    <input type="text" name="name" id="name" placeholder="Podaj imię" class="form-control">
+
                     <br>
                     <label for="message">Wiadomość</label>
                     <textarea name="message" id="message" class="form-control" placeholder="Wpisz wiadomość"></textarea>
                     <br>
                     <input type="submit" value="Wyślij" class="btn btn-danger">
+
+
                 </form>
+                <form action="/logout">
+                    <input type="submit" value="Wyloguj się" class="btn btn-danger">
+                </form>
+
+
+
             </div>
             <div class="col-6">
                 <h3>Wiadomość</h3>
@@ -45,32 +52,48 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io(); // połączenie z serwerem
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io(); // połączenie z serwerem
 
-        const form = document.getElementById('messForm');
-        const nameInput = document.getElementById('name');
-        const messageInput = document.getElementById('message');
-        const allMessages = document.getElementById('all_mess');
+            let currentUser = null;
 
-        // wysyłanie wiadomości
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
+            fetch('/session')
+                .then(res => {
+                    if (!res.ok) throw new Error('Błąd sesji');
+                    return res.json();
+                })
+                .then(data => {
+                    currentUser = data;
+                    console.log('Zalogowany jako: ', data.username);
+                    console.log('chy admin?: ', data.isAdmin);
+                })
 
-            const name = nameInput.value.trim();
-            const message = messageInput.value.trim();
+                .catch(err => console.error(err));
 
-            if (name && message) {
-                socket.emit('chat message', { name, message });
-                messageInput.value = ''; // wyczyść pole wiadomości
-            }
-        });
+            const form = document.getElementById('messForm');
+            const nameInput = document.getElementById('name');
+            const messageInput = document.getElementById('message');
+            const allMessages = document.getElementById('all_mess');
 
-        // odbieranie wiadomości
-        socket.on('chat message', (data) => {
-            const div = document.createElement('div');
-            div.classList.add('alert', 'alert-secondary', 'mt-2');
-            div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
-            allMessages.appendChild(div);
+            // wysyłanie wiadomości
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const message = messageInput.value.trim();
+
+                if (message && currentUser) {
+                    socket.emit('chat message', { name: currentUser.username, message });
+                    messageInput.value = ''; // wyczyść pole wiadomości
+                }
+            });
+
+            // odbieranie wiadomości
+            socket.on('chat message', (data) => {
+                const div = document.createElement('div');
+                div.classList.add('alert', 'alert-secondary', 'mt-2');
+                div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+                allMessages.appendChild(div);
+            });
         });
     </script>
 
