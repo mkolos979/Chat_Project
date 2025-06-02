@@ -18,10 +18,7 @@ const Message = require('./models/Message')
 
 const mongoURI = 'mongodb+srv://mkolos979:AWpDMSE6rlcy2eVY@cluster0.vwgjinv.mongodb.net/chatApp?retryWrites=true&w=majority';
 
-mongoose.connect(mongoURI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => {
+mongoose.connect(mongoURI).then(() => {
     console.log('Połączono z MongoDB');
 }).catch((err) => {
     console.error('Błąd połączenia z MongoDB:', err);
@@ -98,27 +95,57 @@ app.get('/session', (req, res) => {
 });
 
 
+// Midleware sprawdzający czy użytkownik jest adminem
+function isAdmin(req, res, next) {
+    console.log('Права admin:', req.session.user && req.session.user.isAdmin);
+    if (req.session.user && req.session.user.isAdmin) {
+        next();
+    } else {
+        res.status(403).send("Dostęp zabroniony: wymaga rola admina")
+    }
+}
+
+// Usuwanie wiadomości po ID (tylko dla admina)
+app.delete('/message/:id', isAdmin, async (req, res) => {
+    try {
+        const messageId = req.params.id;
+        console.log('видалення повідомлення з id: ', messageId);
+
+        const deleted = await Message.findByIdAndDelete(messageId);
+        console.log('Результат видалення:', deleted);
+
+        if (deleted) {
+            io.emit('message deleted', messageId); // повідомити всіх
+            res.status(200).send('Wiadomość usunięta');
+        } else {
+            res.status(404).send('Повідомлення не знайдено');
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Błąд padczas usuwania wiadomości');
+    }
+});
+
 // Obsługa połączenia Socket.IO
 io.on('connection', async (socket) => {
     console.log('Użytkownik połączony');
 
     // Wysłanie historii wiadomości przy połączeniu
     const messages = await Message.find().sort({ timestamp: 1 }).limit(50);
-    socket.emit('chat history', messages);
+    socket.emit('chat history', messages.reverse());
 
     // Obsługa nowej wiadomości
     socket.on('chat message', async (data) => {
+        console.log('📥 Otrzymano wiadomość od klienta:', data);
+
         const msg = new Message(data);
         await msg.save();
-        io.emit('chat message', data); // wysyłamy do wszystkich
+        io.emit('chat message', msg); // wysyłamy do wszystkich
     });
 
-
-    socket.on('disconnect', () => {
-        console.log('Użytkownik rozłączony');
+    socket.on('connect', () => {
+        console.log('socket.io підключено: ');
     });
-
-
 });
 
 // Uruchomienie serwera

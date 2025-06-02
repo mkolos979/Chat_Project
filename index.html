@@ -52,11 +52,17 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        let currentUser = null; // глобальна змінна для збереження даних користувача
+        let socket;
+        let allMessages;
+        let historyBuffer = []; // буфер для збереження історії повідомлень
+
         document.addEventListener('DOMContentLoaded', () => {
-            const socket = io(); // połączenie z serwerem
+            socket = io(); // встановлюємо з'єднання з сервером
 
-            let currentUser = null;
+            console.log('📡 Socket.IO połączone:', socket);
 
+            // Отримуємо сесію користувача
             fetch('/session')
                 .then(res => {
                     if (!res.ok) throw new Error('Błąd sesji');
@@ -64,37 +70,96 @@
                 })
                 .then(data => {
                     currentUser = data;
-                    console.log('Zalogowany jako: ', data.username);
-                    console.log('chy admin?: ', data.isAdmin);
+                    console.log('Zalogowany jako: ', currentUser.username);
+                    maybeRender(); // ВИПРАВЛЕНО: викликаємо рендер після отримання сесії
                 })
-
                 .catch(err => console.error(err));
 
             const form = document.getElementById('messForm');
-            const nameInput = document.getElementById('name');
             const messageInput = document.getElementById('message');
-            const allMessages = document.getElementById('all_mess');
+            allMessages = document.getElementById('all_mess');
 
-            // wysyłanie wiadomości
+            // Обробка надсилання повідомлення
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
 
                 const message = messageInput.value.trim();
 
                 if (message && currentUser) {
+                    console.log('📤 Wysyłanie wiadomości:', { name: currentUser.username, message });
                     socket.emit('chat message', { name: currentUser.username, message });
-                    messageInput.value = ''; // wyczyść pole wiadomości
+                    messageInput.value = ''; // очищуємо поле
                 }
             });
 
-            // odbieranie wiadomości
+            // Отримання історії повідомлень із сервера
+            socket.on('chat history', (messages) => {
+                console.log('отримано історію повідомлень:', messages);
+                historyBuffer = messages;
+                maybeRender(); // ВИПРАВЛЕНО: викликаємо рендер після отримання історії
+            });
+
+            // Отримання нового повідомлення в режимі реального часу
             socket.on('chat message', (data) => {
-                const div = document.createElement('div');
-                div.classList.add('alert', 'alert-secondary', 'mt-2');
-                div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
-                allMessages.appendChild(div);
+                const messageElem = createMessageElement(data);
+                allMessages.appendChild(messageElem);
+            });
+
+            // Обробка видалення повідомлення
+            socket.on('message deleted', (messageId) => {
+                console.log('отримано сигнал на видалення повідомлення з id:', messageId);
+
+                const messages = document.querySelectorAll('#all_mess .alert');
+                messages.forEach(msg => {
+                    if (msg.dataset.id === messageId) {
+                        msg.remove();
+                    }
+                });
             });
         });
+
+        // Функція для рендеру історії, якщо є і користувач, і повідомлення
+        function maybeRender() {
+            if (!currentUser || !historyBuffer.length) return; // ВИПРАВЛЕНО: раніше tryRenderHistory не виконувався через порядок викликів
+            allMessages.innerHTML = '';
+            historyBuffer.forEach(msg => {
+                const messageElem = createMessageElement(msg);
+                allMessages.appendChild(messageElem);
+            });
+        }
+
+        // Функція створення елемента повідомлення
+        function createMessageElement(data) {
+            console.log('створення повідомлення з _id', data._id);
+
+            const div = document.createElement('div');
+            div.classList.add('alert', 'alert-secondary', 'mt-2');
+            div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+
+            div.dataset.id = data._id;
+
+            // Якщо користувач - адмін, додаємо кнопку видалення
+            if (currentUser && currentUser.isAdmin) {
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Usuń';
+                delBtn.classList.add('btn', 'btn-sm', 'btn-danger', 'ml-2');
+                delBtn.style.float = 'right';
+
+                delBtn.onclick = () => {
+                    fetch(`/message/${data._id}`, { method: 'DELETE', credentials: 'include' })
+                        .then(res => {
+                            console.log('відповідь на DELETE: ', res.status);
+                            if (res.ok) {
+                                div.remove();
+                            } else {
+                                alert('Nie udało się usunąć wiadomości');
+                            }
+                        });
+                };
+                div.appendChild(delBtn);
+            }
+            return div;
+        }
     </script>
 
 </body>
