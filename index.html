@@ -11,58 +11,74 @@
         body {
             background: #fcfcfc;
         }
-    </style>
 
+        .header {
+            background-color: #2961f1;
+            color: white;
+            padding: 15px 20px;
+        }
+
+        .header h2 {
+            margin: 0;
+        }
+
+        .logout-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+        }
+    </style>
 </head>
 
-<body>
-    <div class="container">
-        <div class="py-5 text-center">
-            <h2>Czat w czasie rzeczywistym</h2>
+<body class="d-flex flex-column min-vh-100">
+    <div class="header position-relative">
+        <h2>Czat w czasie rzeczywistym</h2>
+        <form action="/logout" method="get" class="logout-btn">
+            <button type="submit" class="btn btn-light btn-sm">Wyloguj się</button>
+        </form>
+    </div>
+
+    <div class="container d-flex flex-column flex-grow-1">
+
+        <div class="py-3 text-center">
             <p class="lead">Wpisz swoje imię i rozpocznij rozmowę</p>
         </div>
-        <div class="row">
-            <div class="col-6">
-                <!-- Formularz do odbierania wiadomości i nazwa -->
-                <h3>Forma wiadomości</h3>
-                <form id="messForm">
 
-                    <br>
-                    <label for="message">Wiadomość</label>
-                    <textarea name="message" id="message" class="form-control" placeholder="Wpisz wiadomość"></textarea>
-                    <br>
-                    <input type="submit" value="Wyślij" class="btn btn-danger">
-
-
-                </form>
-                <form action="/logout">
-                    <input type="submit" value="Wyloguj się" class="btn btn-danger">
-                </form>
-
-
-
+        <div class="row justify-content-center flex-grow-1">
+            <div class="col-md-8 d-flex flex-column">
+                <h3>Wiadomości</h3>
+                <div id="all_mess" class="flex-grow-1 mb-3"
+                    style="max-height: 550px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background: #f9f9f9;">
+                </div>
             </div>
-            <div class="col-6">
-                <h3>Wiadomość</h3>
-                <!-- Dane wyjściowe wszystkich postów będą tutaj -->
-                <div id="all_mess"></div>
+        </div>
+
+        <div class="row justify-content-center mt-3">
+            <div class="col-md-8">
+                <form id="messForm" class="mb-4">
+                    <div class="input-group">
+                        <textarea name="message" id="message" class="form-control" placeholder="Wpisz wiadomość"
+                            rows="3"></textarea>
+                        <div class="input-group-append">
+                            <button type="submit" class="btn btn-danger">Wyślij</button>
+                        </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        let currentUser = null; // глобальна змінна для збереження даних користувача
+        let currentUser = null;
         let socket;
         let allMessages;
-        let historyBuffer = []; // буфер для збереження історії повідомлень
+        let historyBuffer = [];
 
         document.addEventListener('DOMContentLoaded', () => {
-            socket = io(); // встановлюємо з'єднання з сервером
+            socket = io();
+            console.log('Socket.IO połączone:', socket);
 
-            console.log('📡 Socket.IO połączone:', socket);
-
-            // Отримуємо сесію користувача
             fetch('/session')
                 .then(res => {
                     if (!res.ok) throw new Error('Błąd sesji');
@@ -71,7 +87,7 @@
                 .then(data => {
                     currentUser = data;
                     console.log('Zalogowany jako: ', currentUser.username);
-                    maybeRender(); // ВИПРАВЛЕНО: викликаємо рендер після отримання сесії
+                    maybeRender();
                 })
                 .catch(err => console.error(err));
 
@@ -79,36 +95,37 @@
             const messageInput = document.getElementById('message');
             allMessages = document.getElementById('all_mess');
 
-            // Обробка надсилання повідомлення
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
-
                 const message = messageInput.value.trim();
-
                 if (message && currentUser) {
-                    console.log('📤 Wysyłanie wiadomości:', { name: currentUser.username, message });
+                    console.log('Wysyłanie wiadomości:', { name: currentUser.username, message });
                     socket.emit('chat message', { name: currentUser.username, message });
-                    messageInput.value = ''; // очищуємо поле
+                    messageInput.value = '';
                 }
             });
 
-            // Отримання історії повідомлень із сервера
-            socket.on('chat history', (messages) => {
-                console.log('отримано історію повідомлень:', messages);
-                historyBuffer = messages;
-                maybeRender(); // ВИПРАВЛЕНО: викликаємо рендер після отримання історії
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    form.dispatchEvent(new Event('submit'));
+                }
             });
 
-            // Отримання нового повідомлення в режимі реального часу
+            socket.on('chat history', (messages) => {
+                console.log('otrzymano historię wiadomości:', messages);
+                historyBuffer = messages;
+                maybeRender();
+            });
+
             socket.on('chat message', (data) => {
                 const messageElem = createMessageElement(data);
                 allMessages.appendChild(messageElem);
+                scrollToBottom();
             });
 
-            // Обробка видалення повідомлення
             socket.on('message deleted', (messageId) => {
-                console.log('отримано сигнал на видалення повідомлення з id:', messageId);
-
+                console.log('otrzymano sygnał na usunięcie wiadomości z id:', messageId);
                 const messages = document.querySelectorAll('#all_mess .alert');
                 messages.forEach(msg => {
                     if (msg.dataset.id === messageId) {
@@ -118,51 +135,52 @@
             });
         });
 
-        // Функція для рендеру історії, якщо є і користувач, і повідомлення
         function maybeRender() {
-            if (!currentUser || !historyBuffer.length) return; // ВИПРАВЛЕНО: раніше tryRenderHistory не виконувався через порядок викликів
+            if (!currentUser || !historyBuffer.length) return;
             allMessages.innerHTML = '';
             historyBuffer.forEach(msg => {
                 const messageElem = createMessageElement(msg);
                 allMessages.appendChild(messageElem);
             });
+            scrollToBottom();
         }
 
-        // Функція створення елемента повідомлення
         function createMessageElement(data) {
-            console.log('створення повідомлення з _id', data._id);
-
             const div = document.createElement('div');
-            div.classList.add('alert', 'alert-secondary', 'mt-2');
-            div.innerHTML = `<strong>${data.name}:</strong> ${data.message}`;
+            const isMe = currentUser && currentUser.username === data.name;
 
-            div.dataset.id = data._id;
+            div.className = `d-flex ${isMe ? 'justify-content-end' : 'justify-content-start'} mb-2`;
 
-            // Якщо користувач - адмін, додаємо кнопку видалення
-            if (currentUser && currentUser.isAdmin) {
+            const msgBubble = document.createElement('div');
+            msgBubble.className = `p-2 rounded ${isMe ? 'bg-primary text-white' : 'bg-secondary text-white'}`;
+            msgBubble.style.maxWidth = '75%';
+
+            const time = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '';
+
+            msgBubble.innerHTML = `<small><strong>${data.name}</strong> <span class="text-light-50">${time}</span></small><br>${data.message}`;
+
+            if (currentUser?.isAdmin) {
                 const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-sm btn-danger ml-2';
                 delBtn.textContent = 'Usuń';
-                delBtn.classList.add('btn', 'btn-sm', 'btn-danger', 'ml-2');
-                delBtn.style.float = 'right';
-
                 delBtn.onclick = () => {
                     fetch(`/message/${data._id}`, { method: 'DELETE', credentials: 'include' })
                         .then(res => {
-                            console.log('відповідь на DELETE: ', res.status);
-                            if (res.ok) {
-                                div.remove();
-                            } else {
-                                alert('Nie udało się usunąć wiadomości');
-                            }
+                            if (res.ok) div.remove();
+                            else alert('Nie udało się usunąć wiadomości');
                         });
                 };
-                div.appendChild(delBtn);
+                msgBubble.appendChild(delBtn);
             }
+
+            div.appendChild(msgBubble);
             return div;
         }
+
+        function scrollToBottom() {
+            allMessages.scrollTop = allMessages.scrollHeight;
+        }
     </script>
-
 </body>
-
 
 </html>
